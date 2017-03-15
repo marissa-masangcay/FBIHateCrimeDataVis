@@ -1,0 +1,294 @@
+
+<!-- GOT FROM: https://bl.ocks.org/mbostock/4342045 and https://bl.ocks.org/sjengle/ff5c5d2ca23389739f05 -->
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+
+.states {
+  fill: #ccc;
+  stroke: #fff;
+}
+
+.symbol {
+  fill-opacity: .8;
+  stroke: #fff;
+}
+
+circle  {
+  stroke: dimgrey;
+  fill: none;
+}
+
+</style>
+<body>
+<script src="//d3js.org/d3.v3.min.js"></script>
+<script src="//d3js.org/topojson.v1.min.js"></script>
+<script src="//d3js.org/queue.v1.min.js"></script>
+<h1 style="font-family:verdana;"><center><font size="5">US 2013 Per Capita State Hate Crime Report </font></h1>
+<script>
+
+var width = 1050,
+    height = 500;
+
+var radius = d3.scale.sqrt()
+    .domain([0, 1e6])
+    .range([0, 10]);
+
+var path = d3.geo.path();
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var details = svg.append("foreignObject").attr("id", "details");
+
+// initialize tooltip
+details.attr({
+  "x": 250,
+  "y": 0,
+  "width": 400
+}).style({
+  "font": "16px verdana",
+  "visibility": "hidden"
+})
+.append("xhtml:body")
+.html("<p>N/A</p>");
+
+ var color = d3.scale.ordinal()
+        .domain(["ethnicity", "race", "gender", "gender_identity", "sexual_orientation", "disability", "religion"])
+        .range(["#9C44BB", "#62A1D5", "#bae4b3", "#006d2c", "#62CD6E", "#800080", "#E55451"]);
+
+ var perCapitaData;
+ var maxCategory;
+  var obj = {};
+
+
+d3.csv("FBI_Hate_Crime.csv", function(error, data) {
+  if (error) throw error;
+
+  perCapitaData = d3.nest()
+     .key(function(d) {return d.State; })
+     .rollup(function(d) {
+      var out = {};
+
+      out.disability = d3.sum(d, function(j) {
+        return +j.Disability;
+      });
+
+      out.ethnicity = d3.sum(d, function(j) {
+        return +j.Ethnicity;
+      });
+
+      out.gender = d3.sum(d, function(j) {
+        return +j.Gender;
+      })
+
+      out.gender_identity = d3.sum(d, function(j) {
+        return +j.Gender_Identity;
+      })
+
+      out.race = d3.sum(d, function(j) {
+        return +j.Race;
+      })
+
+      out.religion = d3.sum(d, function(j) {
+        return +j.Religion;
+      })
+
+      out.sexual_orientation = d3.sum(d, function(j) {
+        return +j.Sexual_orientation;
+      })
+
+      out.population = d3.sum(d, function(j) {
+        return +j.Population;
+      })
+
+      out.perCapita = 0;
+
+      out.maxCategory;
+
+      out.test = [];
+
+      return out;
+     })
+     .entries(data);
+
+       //Calculates per capita for each state
+  perCapitaData.forEach(function(d) {
+    var perCap = (d.values.annualTotal/d.values.population)*100000;
+    d.values.perCapita = perCap;
+  })
+
+  //Calculates per capita for each state
+  perCapitaData.forEach(function(d) {
+    d.values.test = [+d.values.ethnicity, +d.values.sexual_orientation, +d.values.religion, +d.values.race, +d.values.gender_identity, +d.values.gender, +d.values.disability];
+     var maxNum = (d3.max(d.values.test));
+     var maxCat;
+    for(i = 0; i<d.values.test.length; i++) {
+
+      if(+d.values.ethnicity === maxNum){
+        maxCat = "ethnicity";
+      }
+
+      else if(+d.values.sexual_orientation === maxNum) {
+        maxCat = "sexual_orientation";
+      }
+
+      else if(+d.values.religion === maxNum) {
+        maxCat = "religion";
+      }
+
+      else if(+d.values.race === maxNum) {
+        maxCat = "race";
+      }
+
+      else if(+d.values.race === maxNum) {
+        maxCat = "gender_identity";
+      }
+
+      else if(+d.values.gender_identity === maxNum) {
+        maxCat = "gender";
+      }
+
+      else if(+d.values.disability === maxNum) {
+        maxCat = "disability";
+      }
+
+    }
+    d.values.maxCategory = maxCat;
+  })
+
+    perCapitaData.forEach(function(d) {
+    obj[d.key] = d.values.maxCategory;
+  });
+  
+});
+
+queue()
+    .defer(d3.json, "https://gist.githubusercontent.com/mbostock/4090846/raw/d534aba169207548a8a3d670c9c2cc719ff05c47/us.json")
+    // .defer(d3.json, "https://raw.githubusercontent.com/benkeen/miscellaneous/master/d3collision/us-state-centroids.json")
+    .defer(d3.json, "perCapita.json")
+    .await(ready);
+
+
+function ready(error, us, centroid) {
+  if (error) throw error;
+
+  console.log(perCapitaData);
+
+  svg.append("path")
+      .attr("class", "states")
+      .datum(topojson.feature(us, us.objects.states))
+      .attr("d", path);
+
+  svg.selectAll(".symbol")
+      .data(centroid.features.sort(function(a, b) { return b.properties.perCapita - a.properties.perCapita; }))
+    .enter().append("path")
+      .attr("class", "symbol")
+      .attr("fill", function(d) { return colorCircles(d);})
+      .attr("d", path.pointRadius(function(d) { return radius(d.properties.perCapita*500000); }))
+      .on("mouseover", function(d) {
+        var me = d3.select(this);
+        me.classed({"active": true});
+
+        details.text("State: " + d.properties.name + ", Per Capita: " + d.properties.perCapita).html;
+        details.style({"visibility": "visible"});
+
+        this.parentNode.appendChild(this);
+      })
+      .on("mousemove", function(d) {
+        var coords = d3.mouse(svg.node());
+        details.attr({"x": 250, "y": 0});
+      })
+      .on("mouseout", function(d) {
+        var me = d3.select(this);
+        me.classed({"active": false});
+        details.style({"visibility": "hidden"});
+      });
+
+  
+  var legend = svg.selectAll(".legend")
+      .data(color.domain())
+    .enter().append("g")
+      .attr("class", "legend")
+      .attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+
+  legend.append("rect")
+      .attr("x", width - 18)
+      .attr("y", 13)
+      .attr("width", 18)
+      .attr("height", 18)
+      .style("fill", function(d) { if(d == null){return "#FFFFFF"} else{return color(d);} });
+
+  legend.append("text")
+      .attr("x", width-25)
+      .attr("y", 20)
+      .attr("dy", ".35em")
+      .style("text-anchor", "end")
+      .style("font", "14px sans-serif")
+      .text(function(d) { return d.replace("_", " "); });
+  };
+
+    var bubbleLegend = svg.append("g")
+    .attr("id", "bubble-legend")
+    .attr("class", "area_legend");
+
+  bubbleLegend.append("text")
+    .attr("text-anchor", "middle")
+    .attr("x", width-58)
+    .attr("y", 250)
+    .attr("dx", 0)
+    .attr("dy", "12px")
+    .style("font", "14px sans-serif")
+    .text("Per Capita Ratio");
+
+  bubbleLegend.append("circle")
+    .attr("cx", width-55)
+    .attr("cy", 325)
+    .attr("r", 35);
+
+  bubbleLegend.append("text")
+    .attr("x", width-62)
+    .attr("y", 275)
+    .attr("dx", 0)
+    .attr("dy", "12px")
+    .text(Math.round(25));
+
+  bubbleLegend.append("circle")
+    .attr("cx", width-55)
+    .attr("cy", 336)
+    .attr("r", 23);
+
+  bubbleLegend.append("text")
+    .attr("text-anchor", "middle")
+    .attr("x", width-55)
+    .attr("y", 298)
+    .attr("dx", 0)
+    .attr("dy", "12px")
+    .text(Math.round(10));
+
+  bubbleLegend.attr("transform", translate(5, 0));
+
+function colorCircles(a) {
+  var cat = a.properties.name;
+  var cat2 = cat.replace(" ", "_");
+  if(cat2 === "District_of Columbia") {
+    cat2 = "DC";
+  }
+  return color(obj[cat2]);
+}
+
+function translate(x, y) {
+  return "translate(" + x + "," + y + ")";
+}
+
+</script>
+<br>
+<br>
+<font size="2px">*The per capita ratio was calculated per 100,000 people.</font>
+<h3><center><font face="sans-serif"> Findings</font></center></h3>
+<p><center><font face="sans-serif">
+As you can see from the map, racial hate crimes are the most frequently occurring hate crimes among the whole US. Only 6 states out of the whole US have a different most frequently occurring hate crime. These six states are divided among sexual orientation, ethnicity, and religion. Another thing to note is that West Virginia has by far the biggest per capita crime rate with a per capita of 25.16 hate crimes occurring per 100,000 people. One can also see that there is a much higher concentration of high per capita ratios in the north east region of the US. Four of the top five per capita states are located in the north east region with South Dakota being an outlier in the north. There is also a trend of the southern states from the west to the east coast having lower per capita ratios. 
+</font>
+</center>
+</p>

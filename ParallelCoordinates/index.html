@@ -1,0 +1,265 @@
+<!-- GOT FROM: http://bl.ocks.org/mbostock/1341021 -->
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>Parallel Coordinates Ordinal Axis</title>
+<style>
+svg {
+  font: 10px sans-serif;
+}
+
+.background path {
+  fill: none;
+  stroke: none;
+  stroke-width: 20px;
+  pointer-events: stroke;
+}
+
+.foreground path {
+  fill: none;
+  stroke: #E1688D;
+  stroke-width: 1.5px;
+}
+
+.axis .title {
+  font-size: 8px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.axis line,
+.axis path {
+  fill: none;
+  stroke: #000;
+  shape-rendering: crispEdges;
+}
+
+.axis.string {
+  font-size: 4px;
+}
+
+.active .label:not(.inactive) {
+  font-weight: bold;
+  font-size: 6px;
+}
+
+.label.inactive {
+  fill: #ccc;
+}
+
+.foreground path.inactive {
+  stroke: #ccc;
+  stroke-opacity: .5;
+  stroke-width: 1px;
+}
+
+</style>
+<body>
+<script src="http://d3js.org/d3.v2.min.js"></script>
+<h1 style="font-family:verdana;"><center><font size="5">FBI's 2013 Top 10 State Per Capita Hate Crime Report Stats </font></h1>
+<script>
+
+var margin = {top: 30, right: 40, bottom: 20, left: 200},
+    width = 1000 - margin.left - margin.right,
+    height = 550 - margin.top - margin.bottom;
+
+var dimensions = [
+  {
+    name: "State",
+    scale: d3.scale.ordinal().rangePoints([0, height]),
+    type: "string"
+  },
+      {
+    name: "Population",
+    scale: d3.scale.linear().range([height, 0]),
+    type: "number"
+  },
+  {
+    name: "column_1st_quarter",
+    scale: d3.scale.linear().range([height, 0]),
+    type: "number"
+  },
+  {
+    name: "column_2nd_quarter",
+    scale: d3.scale.linear().range([height, 0]),
+    type: "number"
+  },
+  {
+    name: "column_3rd_quarter",
+    scale: d3.scale.linear().range([height, 0]),
+    type: "number"
+  },
+  {
+    name: "column_4th_quarter",
+    scale: d3.scale.linear().range([height, 0]),
+    type: "number"
+  },
+  {
+    name: "annualTotal",
+    scale: d3.scale.linear().range([height, 0]),
+    type: "number"
+  },
+  {
+    name: "Agency_type",
+    scale: d3.scale.ordinal().rangePoints([0, height]),
+    type: "string"
+  },
+];
+
+ var color = d3.scale.ordinal()
+    .range(["rgb(158,1,66)", "rgb(213,62,79)", "rgb(244,109,67)", "rgb(253,174,97)", "rgb(254,224,139)", "rgb(255,255,191)", "rgb(230,245,152)", "rgb(171,221,164)", "rgb(102,194,165)", "rgb(50,136,189)", "rgb(94,79,162)"].reverse());
+
+var x = d3.scale.ordinal()
+    .domain(dimensions.map(function(d) { return d.name; }))
+    .rangePoints([0, width]);
+
+var line = d3.svg.line()
+    .defined(function(d) { return !isNaN(d[1]); });
+
+var yAxis = d3.svg.axis()
+    .orient("left");
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+var details = svg.append("foreignObject").attr("id", "details");
+
+// initialize tooltip
+details.attr({
+  "x": 150,
+  "y": -33,
+  "width": 700,
+}).style({
+  "visibility": "hidden"
+})
+.append("xhtml:body")
+.html("<p>N/A</p>");
+
+var dimension = svg.selectAll(".dimension")
+    .data(dimensions)
+  .enter().append("g")
+    .attr("class", "dimension")
+    .attr("transform", function(d) { return "translate(" + x(d.name) + ")"; });
+
+d3.csv("FBI_Hate_Crime.csv", function(data) {
+
+  //Convert strings to ints
+  data.forEach(function(d) {
+    d.column_1st_quarter = +d.column_1st_quarter;
+    d.column_2nd_quarter = +d.column_2nd_quarter;
+    d.column_3rd_quarter = +d.column_3rd_quarter;
+    d.column_4th_quarter = +d.column_4th_quarter;
+    d.Disability = +d.Disability;
+    d.Ethnicity = +d.Ethnicity;
+    d.Gender = +d.Gender;
+    d.Gender_Identity = +d.Gender_Identity;
+    d.Race = +d.Race;
+    d.Religion = +d.Religion; 
+    d.Sexual_orientation = +d.Sexual_orientation;
+    d.Population = +d.Population;
+    d.annualTotal = d.column_1st_quarter + d.column_2nd_quarter + d.column_3rd_quarter + d.column_4th_quarter;
+  });
+
+  data = data.filter(function(d){ 
+    if(d.State === "North_Dakota" || d.State === "West_Virginia" || d.State === "Texas" || d.State === "Delaware" || d.State === "Maine" 
+      || d.State === "DC" || d.State === "Georgia" || d.State === "New_Jersey" || d.State === "Montana")
+      // || d.State === "Massachusetts"
+    {
+      return true;
+    }
+    else{
+    return false;
+  }
+    });
+
+  var color = d3.scale.ordinal()
+    .range(["rgb(158,1,66)", "rgb(213,62,79)", "rgb(244,109,67)", "rgb(253,174,97)", "rgb(254,224,139)", "rgb(255,255,191)", "rgb(230,245,152)", "rgb(171,221,164)", "rgb(102,194,165)", "rgb(50,136,189)", "rgb(94,79,162)"].reverse());
+
+
+  dimensions.forEach(function(dimension) {
+    dimension.scale.domain(dimension.type === "number"
+        ? d3.extent(data, function(d) { return +d[dimension.name]; })
+        : data.map(function(d) { return d[dimension.name]; }).sort());
+    dimension.moveToFront;
+  });
+
+  svg.append("g")
+      .attr("class", "background")
+    .selectAll("path")
+      .data(data)
+    .enter().append("path")
+      .attr("d", draw);
+
+  svg.append("g")
+      .attr("class", "foreground")
+    .selectAll("path")
+      .data(data)
+    .enter().append("path")
+      .attr("d", draw);
+
+  dimension.append("g")
+      .attr("class", "axis")
+      .each(function(d) { d3.select(this).call(yAxis.scale(d.scale)); })
+    .append("text")
+      .attr("class", "title")
+      .attr("text-anchor", "middle")
+      .attr("y", -9)
+      .text(function(d) { return d.name; });
+
+  var ordinal_labels = svg.selectAll(".axis text")
+      .on("mouseover", mouseover)
+      .on("mouseout", mouseout);
+
+  var projection = svg.selectAll(".background path,.foreground path")
+      .on("mouseover", mouseover)
+      .on("mouseout", mouseout);
+
+  function mouseover(d) {
+    svg.classed("active", true);
+
+    if (typeof d === "string") {
+      projection.classed("inactive", function(p) { return p.name !== d; });
+      projection.filter(function(p) { return p.name === d; }).each(moveToFront);
+      ordinal_labels.classed("inactive", function(p) { return p !== d; });
+      ordinal_labels.filter(function(p) { return p === d; }).each(moveToFront);
+    } else {
+      projection.classed("inactive", function(p) { return p !== d; });
+      projection.filter(function(p) { return p === d; }).each(moveToFront);
+      ordinal_labels.classed("inactive", function(p) { return p !== d.name; });
+      ordinal_labels.filter(function(p) { return p === d.name; }).each(moveToFront);
+    }
+
+    details.text("State: " + d.State + ", Agency Name: "+ d.Agency_name + ", Population: " + d.Population);
+    details.style("font", "14px sans-serif");
+    details.style("font-weight", "bold");
+    details.style({"visibility": "visible"});
+  }
+
+  function mouseout(d) {
+    svg.classed("active", false);
+    projection.classed("inactive", false);
+    ordinal_labels.classed("inactive", false);
+    details.style({"visibility": "hidden"});
+  }
+
+  function moveToFront() {
+    this.parentNode.appendChild(this);
+  }
+});
+
+function draw(d) {
+  return line(dimensions.map(function(dimension) {
+    return [x(dimension.name), dimension.scale(d[dimension.name])];
+  }));
+}
+
+</script>
+
+<h3><center><font face="sans-serif"> Findings</font></center></h3>
+<p><center><font face="sans-serif">
+As you can see from the chart, although there a lot of different variances between each reported crime, there are two areas where the lines bunch together indicating trends. The first trend is that a majority of these places where the crime took place have smaller populations. You can see that a lot of them bunch up under the 200,000 mark. However one thing to note is that there are some places with a zero population due to it being a police state or other agency types so there is a slight variance off with the population. Nevertheless if you look at the second trend you can see that the lines also bunch up in the cities area under the agency type. Therefore this does show that a large amount of hate crimes do happen in cities with a smaller population. Although I cannot speculate as to why this shows to be the trend it is most definitely something to note. 
+</font>
+</center>
+</p>
